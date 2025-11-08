@@ -1,4 +1,4 @@
-module xilinx_spdistram_async #(
+module xilinx_sp_distram #(
     parameter ADDR_WIDTH = 6,
     parameter DATA_WIDTH = 1
 ) (
