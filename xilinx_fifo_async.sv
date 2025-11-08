@@ -14,12 +14,12 @@
 /////////////////////////////////////////////////////////////////
 
 module xilinx_fifo_async #(
-   parameter ALMOST_EMPTY_OFFSET = 9'h080, // Sets the almost empty threshold
-   parameter ALMOST_FULL_OFFSET = 9'h080,  // Sets almost full threshold
-   parameter DATA_WIDTH = 0,   // Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
-   parameter DEVICE = "7SERIES",  // Target device: "7SERIES"
-   parameter FIFO_SIZE = "18Kb", // Target BRAM: "18Kb" or "36Kb"
-   parameter FIRST_WORD_FALL_THROUGH = "FALSE" // Sets the FIFO FWFT to "TRUE" or "FALSE"
+   parameter ALMOST_EMPTY_OFFSET    = 9'h080, // Sets the almost empty threshold
+   parameter ALMOST_FULL_OFFSET     = 9'h080,  // Sets almost full threshold
+   parameter DATA_WIDTH             = 0,   // Valid values are 1-72 (37-72 only valid when FIFO_SIZE="36Kb")
+   parameter DEVICE                 = "7SERIES",  // Target device: "7SERIES"
+   parameter FIFO_SIZE              = "18Kb", // Target BRAM: "18Kb" or "36Kb"
+   parameter FIRST_WORD_FALL_THROUGH= "FALSE" // Sets the FIFO FWFT to "TRUE" or "FALSE"
 ) (
    output logic                     ALMOSTEMPTY, // 1-bit output almost empty
    output logic                     ALMOSTFULL,  // 1-bit output almost full
@@ -38,6 +38,7 @@ module xilinx_fifo_async #(
    input  logic                     WREN         // 1-bit input write enable
 );
 
+generate if (FIFO_SIZE=="18Kb") begin
 
 // FIFO18E1: 18Kb FIFO (First-In-First-Out) Block RAM Memory
 //           7 Series
@@ -84,6 +85,7 @@ FIFO18E1_inst (
 
 // End of FIFO18E1_inst instantiation
 
+end else begin
 
 // FIFO36E1: 36Kb FIFO (First-In-First-Out) Block RAM Memory
 //           7 Series
@@ -138,5 +140,7 @@ FIFO36E1_inst (
 );
 
 // End of FIFO36E1_inst instantiation
+
+end endgenerate
 
 endmodule

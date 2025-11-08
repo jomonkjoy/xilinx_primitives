@@ -1,10 +1,10 @@
 
 module shallow_fifo_sync #(
-    parameter DATA_WIDTH = 8,
-    parameter FIFO_DEPTH = 32,
-    parameter PROG_FULL_THRESH = 8,
-    parameter PROG_EMPTY_THRESH = 8,
-    parameter COUNT_WIDTH = $clog2(FIFO_DEPTH)+1
+    parameter DATA_WIDTH            = 8,
+    parameter FIFO_DEPTH            = 32,
+    parameter PROG_FULL_THRESH      = 8,
+    parameter PROG_EMPTY_THRESH     = 8,
+    parameter COUNT_WIDTH           = $clog2(FIFO_DEPTH)+1
 )(
     input  logic                    clk,
     input  logic                    rst_n,

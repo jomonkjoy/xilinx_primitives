@@ -19,15 +19,15 @@
 /////////////////////////////////////////////////////////////////////
 
 module xilinx_sp_bram #(
-   parameter BRAM_SIZE = "18Kb", // Target BRAM, "18Kb" or "36Kb"
-   parameter DEVICE = "7SERIES", // Target Device: "7SERIES"
-   parameter DO_REG = 0, // Optional output register (0 or 1)
-   parameter INIT = 36'h000000000, // Initial values on output port
-   parameter INIT_FILE  = "NONE",
-   parameter WRITE_WIDTH = 0, // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
-   parameter READ_WIDTH = 0,  // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
-   parameter SRVAL = 36'h000000000, // Set/Reset value for port output
-   parameter WRITE_MODE = "WRITE_FIRST" // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
+   parameter BRAM_SIZE          = "18Kb", // Target BRAM, "18Kb" or "36Kb"
+   parameter DEVICE             = "7SERIES", // Target Device: "7SERIES"
+   parameter DO_REG             = 0, // Optional output register (0 or 1)
+   parameter INIT               = 36'h000000000, // Initial values on output port
+   parameter INIT_FILE          = "NONE",
+   parameter WRITE_WIDTH        = 0, // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+   parameter READ_WIDTH         = 0,  // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+   parameter SRVAL              = 36'h000000000, // Set/Reset value for port output
+   parameter WRITE_MODE         = "WRITE_FIRST" // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
 ) (
    output logic [READ_WIDTH-1:0]    DO,       // Output data, width defined by READ_WIDTH parameter
    input  logic [14:0]              ADDR,     // Input address, width defined by read/write port depth
@@ -38,6 +38,8 @@ module xilinx_sp_bram #(
    input  logic                     RST,      // 1-bit input reset
    input  logic [7:0]               WE        // Input write enable, width defined by write port depth
 );
+
+generate if (BRAM_SIZE=="18Kb") begin
 
 // RAMB18E1: 18K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -184,6 +186,7 @@ RAMB18E1_inst (
 
 // End of RAMB18E1_inst instantiation
 
+end else begin
 
 // RAMB36E1: 36K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -422,5 +425,7 @@ RAMB36E1_inst (
 );
 
 // End of RAMB36E1_inst instantiation
+
+end endgenerate
 
 endmodule

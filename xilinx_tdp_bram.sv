@@ -16,23 +16,23 @@
 //////////////////////////////////////////////////////////////////////////
 
 module xilinx_tdp_bram #(
-   parameter BRAM_SIZE = "18Kb", // Target BRAM: "18Kb" or "36Kb"
-   parameter DEVICE = "7SERIES", // Target device: "7SERIES"
-   parameter DOA_REG = 0,        // Optional port A output register (0 or 1)
-   parameter DOB_REG = 0,        // Optional port B output register (0 or 1)
-   parameter INIT_A = 36'h0000000,  // Initial values on port A output port
-   parameter INIT_B = 36'h00000000, // Initial values on port B output port
-   parameter INIT_FILE  = "NONE",
-   parameter READ_WIDTH_A  = 0,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
-   parameter READ_WIDTH_B  = 0,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
-   parameter SIM_COLLISION_CHECK  = "ALL", // Collision check enable "ALL", "WARNING_ONLY",
-                                 //   "GENERATE_X_ONLY" or "NONE"
-   parameter SRVAL_A = 36'h00000000, // Set/Reset value for port A output
-   parameter SRVAL_B = 36'h00000000, // Set/Reset value for port B output
-   parameter WRITE_MODE_A = "WRITE_FIRST", // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
-   parameter WRITE_MODE_B = "WRITE_FIRST", // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
-   parameter WRITE_WIDTH_A = 0, // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
-   parameter WRITE_WIDTH_B = 0  // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter BRAM_SIZE              = "18Kb", // Target BRAM: "18Kb" or "36Kb"
+   parameter DEVICE                 = "7SERIES", // Target device: "7SERIES"
+   parameter DOA_REG                = 0,        // Optional port A output register (0 or 1)
+   parameter DOB_REG                = 0,        // Optional port B output register (0 or 1)
+   parameter INIT_A                 = 36'h0000000,  // Initial values on port A output port
+   parameter INIT_B                 = 36'h00000000, // Initial values on port B output port
+   parameter INIT_FILE              = "NONE",
+   parameter READ_WIDTH_A           = 0,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter READ_WIDTH_B           = 0,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter SIM_COLLISION_CHECK    = "ALL", // Collision check enable "ALL", "WARNING_ONLY",
+                                            //   "GENERATE_X_ONLY" or "NONE"
+   parameter SRVAL_A                = 36'h00000000, // Set/Reset value for port A output
+   parameter SRVAL_B                = 36'h00000000, // Set/Reset value for port B output
+   parameter WRITE_MODE_A           = "WRITE_FIRST", // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
+   parameter WRITE_MODE_B           = "WRITE_FIRST", // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
+   parameter WRITE_WIDTH_A          = 0, // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter WRITE_WIDTH_B          = 0  // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
 ) (
    output logic [READ_WIDTH_A-1:0]  DOA,       // Output port-A data, width defined by READ_WIDTH_A parameter
    output logic [READ_WIDTH_B-1:0]  DOB,       // Output port-B data, width defined by READ_WIDTH_B parameter
@@ -51,6 +51,8 @@ module xilinx_tdp_bram #(
    input  logic [3:0]               WEA,       // Input port-A write enable, width defined by Port A depth
    input  logic [3:0]               WEB        // Input port-B write enable, width defined by Port B depth
 );
+
+generate if (BRAM_SIZE=="18Kb") begin
 
 // RAMB18E1: 18K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -197,6 +199,7 @@ RAMB18E1_inst (
 
 // End of RAMB18E1_inst instantiation
 
+end else begin
 
 // RAMB36E1: 36K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -435,5 +438,7 @@ RAMB36E1_inst (
 );
 
 // End of RAMB36E1_inst instantiation
+
+end endgenerate
 
 endmodule

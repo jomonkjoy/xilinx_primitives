@@ -1,6 +1,6 @@
 module xilinx_sp_distram #(
-    parameter ADDR_WIDTH = 6,
-    parameter DATA_WIDTH = 1
+    parameter ADDR_WIDTH            = 6,
+    parameter DATA_WIDTH            = 1
 ) (
     input  logic                    WCLK,
     input  logic                    WE,

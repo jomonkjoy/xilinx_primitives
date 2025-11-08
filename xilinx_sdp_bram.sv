@@ -19,18 +19,18 @@
 ///////////////////////////////////////////////////////////////////////
 
 module xilinx_sdp_bram #(
-   parameter BRAM_SIZE = "18Kb", // Target BRAM, "18Kb" or "36Kb"
-   parameter DEVICE = "7SERIES", // Target device: "7SERIES"
-   parameter WRITE_WIDTH = 0,    // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
-   parameter READ_WIDTH = 0,     // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
-   parameter DO_REG = 0,         // Optional output register (0 or 1)
-   parameter INIT_FILE = "NONE",
-   parameter SIM_COLLISION_CHECK = "ALL", // Collision check enable "ALL", "WARNING_ONLY",
-                                 //   "GENERATE_X_ONLY" or "NONE"
-   parameter SRVAL = 72'h000000000000000000, // Set/Reset value for port output
-   parameter INIT = 72'h000000000000000000,  // Initial values on output port
-   parameter WRITE_MODE = "WRITE_FIRST"  // Specify "READ_FIRST" for same clock or synchronous clocks
-                                //   Specify "WRITE_FIRST for asynchronous clocks on ports
+   parameter BRAM_SIZE              = "18Kb", // Target BRAM, "18Kb" or "36Kb"
+   parameter DEVICE                 = "7SERIES", // Target device: "7SERIES"
+   parameter WRITE_WIDTH            = 0,        // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+   parameter READ_WIDTH             = 0,        // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+   parameter DO_REG                 = 0,        // Optional output register (0 or 1)
+   parameter INIT_FILE              = "NONE",
+   parameter SIM_COLLISION_CHECK    = "ALL",    // Collision check enable "ALL", "WARNING_ONLY",
+                                                //   "GENERATE_X_ONLY" or "NONE"
+   parameter SRVAL                  = 72'h000000000000000000, // Set/Reset value for port output
+   parameter INIT                   = 72'h000000000000000000,  // Initial values on output port
+   parameter WRITE_MODE             = "WRITE_FIRST"  // Specify "READ_FIRST" for same clock or synchronous clocks
+                                                    //   Specify "WRITE_FIRST for asynchronous clocks on ports
 ) (
    output logic [READ_WIDTH-1:0]    DO,         // Output read data port, width defined by READ_WIDTH parameter
    input  logic [WRITE_WIDTH-1:0]   DI,         // Input write data port, width defined by WRITE_WIDTH parameter
@@ -44,6 +44,8 @@ module xilinx_sdp_bram #(
    input  logic                     WRCLK,      // 1-bit input write clock
    input  logic                     WREN        // 1-bit input write port enable
 );
+
+generate if (BRAM_SIZE=="18Kb") begin
 
 // RAMB18E1: 18K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -190,6 +192,7 @@ RAMB18E1_inst (
 
 // End of RAMB18E1_inst instantiation
 
+end else begin
 
 // RAMB36E1: 36K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -428,5 +431,7 @@ RAMB36E1_inst (
 );
 
 // End of RAMB36E1_inst instantiation
+
+end endgenerate
 
 endmodule
