@@ -2,16 +2,16 @@ module xilinx_dp_distram #(
     parameter ADDR_WIDTH            = 6,
     parameter DATA_WIDTH            = 1
 ) (
-    input  logic                    WCLK,
-    input  logic                    WE,
+    output logic [DATA_WIDTH-1:0]   DPO,
+    output logic [DATA_WIDTH-1:0]   SPO,
     input  logic [ADDR_WIDTH-1:0]   A,
     input  logic [DATA_WIDTH-1:0]   D,
-    output logic [DATA_WIDTH-1:0]   SPO,
     input  logic [ADDR_WIDTH-1:0]   DPRA,
-    output logic [DATA_WIDTH-1:0]   DPO
+    input  logic                    WCLK,
+    input  logic                    WE
 );
 
-RAM_DEPTH = (2**ADDR_WIDTH);
+localparam RAM_DEPTH = (2**ADDR_WIDTH);
 
 // RAM128X1D: 128-deep by 1-wide positive edge write, asynchronous read  (Mapped to two SliceM LUT6s)
 //            dual-port distributed LUT RAM

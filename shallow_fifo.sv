@@ -43,13 +43,13 @@ module shallow_fifo_sync #(
         .ADDR_WIDTH (ADDR_WIDTH),
         .DATA_WIDTH (DATA_WIDTH)
     ) dp_distram_inst (
-        .WCLK   (clk),
-        .WE     (wren_internal),
+        .DPO    (rd_data),
+        .SPO    (),
         .A      (wr_addr),
         .D      (wr_data),
-        .SPO    (),
         .DPRA   (rd_addr),
-        .DPO    (rd_data)
+        .WCLK   (clk),
+        .WE     (wren_internal)
     );
     
     // Write address pointer

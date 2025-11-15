@@ -15,7 +15,9 @@
 //        1       |  "18Kb"   |   16384   |    14-bit     |    1-bit    //
 //////////////////////////////////////////////////////////////////////////
 
-module xilinx_tdp_bram #(
+module xilinx_tdp_bram 
+import xilinx_primitive_pkg::*;
+#(
    parameter BRAM_SIZE              = "18Kb", // Target BRAM: "18Kb" or "36Kb"
    parameter DEVICE                 = "7SERIES", // Target device: "7SERIES"
    parameter DOA_REG                = 0,        // Optional port A output register (0 or 1)
@@ -23,16 +25,16 @@ module xilinx_tdp_bram #(
    parameter INIT_A                 = 36'h0000000,  // Initial values on port A output port
    parameter INIT_B                 = 36'h00000000, // Initial values on port B output port
    parameter INIT_FILE              = "NONE",
-   parameter READ_WIDTH_A           = 0,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
-   parameter READ_WIDTH_B           = 0,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter READ_WIDTH_A           = 1,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter READ_WIDTH_B           = 1,   // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
    parameter SIM_COLLISION_CHECK    = "ALL", // Collision check enable "ALL", "WARNING_ONLY",
                                             //   "GENERATE_X_ONLY" or "NONE"
    parameter SRVAL_A                = 36'h00000000, // Set/Reset value for port A output
    parameter SRVAL_B                = 36'h00000000, // Set/Reset value for port B output
    parameter WRITE_MODE_A           = "WRITE_FIRST", // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
    parameter WRITE_MODE_B           = "WRITE_FIRST", // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
-   parameter WRITE_WIDTH_A          = 0, // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
-   parameter WRITE_WIDTH_B          = 0  // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter WRITE_WIDTH_A          = 1, // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
+   parameter WRITE_WIDTH_B          = 1  // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
 ) (
    output logic [READ_WIDTH_A-1:0]  DOA,       // Output port-A data, width defined by READ_WIDTH_A parameter
    output logic [READ_WIDTH_B-1:0]  DOB,       // Output port-B data, width defined by READ_WIDTH_B parameter
@@ -52,7 +54,47 @@ module xilinx_tdp_bram #(
    input  logic [3:0]               WEB        // Input port-B write enable, width defined by Port B depth
 );
 
-generate if (BRAM_SIZE=="18Kb") begin
+localparam MACRO_SIZE = (WRITE_WIDTH_A>16 || WRITE_WIDTH_B>16) ? "36Kb" : BRAM_SIZE;
+localparam BRAM_DEPTH_A = get_tdp_bram_depth(WRITE_WIDTH_A, MACRO_SIZE);
+localparam BRAM_DEPTH_B = get_tdp_bram_depth(WRITE_WIDTH_B, MACRO_SIZE);
+localparam BRAM_WE_A = get_tdp_we_width(WRITE_WIDTH_A);
+localparam BRAM_WE_B = get_tdp_we_width(WRITE_WIDTH_B);
+localparam ADDR_WIDTH_A = $clog2(BRAM_DEPTH_A);
+localparam ADDR_WIDTH_B = $clog2(BRAM_DEPTH_B);
+
+generate if (MACRO_SIZE=="18Kb") begin
+
+// Internal signals for RAMB18E1
+logic [15:0] DOADO_wire;
+logic [15:0] DOBDO_wire;
+logic [1:0]  DOPADOP_wire;
+logic [1:0]  DOPBDOP_wire;
+logic [13:0] ADDRARDADDR_wire;
+logic [13:0] ADDRBWRADDR_wire;
+logic [15:0] DIADI_wire;
+logic [15:0] DIBDI_wire;
+logic [1:0]  DIPADIP_wire;
+logic [1:0]  DIPBDIP_wire;
+logic [1:0]  WEA_wire;
+logic [3:0]  WEBWE_wire;
+
+// Address mapping for 18Kb BRAM (14-bit address bus)
+assign ADDRARDADDR_wire = {{(14-ADDR_WIDTH_A){1'b0}}, ADDRA[ADDR_WIDTH_A-1:0]};
+assign ADDRBWRADDR_wire = {{(14-ADDR_WIDTH_B){1'b0}}, ADDRB[ADDR_WIDTH_B-1:0]};
+   
+// Data input mapping
+assign DIADI_wire = {{(16-WRITE_WIDTH_A){1'b0}}, DIA};
+assign DIBDI_wire = {{(16-WRITE_WIDTH_B){1'b0}}, DIB};
+assign DIPADIP_wire = 2'b00;
+assign DIPBDIP_wire = 2'b00;
+   
+// Data output mapping
+assign DOA = DOADO_wire[READ_WIDTH_A-1:0];
+assign DOB = DOBDO_wire[READ_WIDTH_B-1:0];
+   
+// Write enable mapping
+assign WEA_wire = WEA[BRAM_WE_A-1:0];
+assign WEBWE_wire = {2'b00, WEB[BRAM_WE_B-1:0]};
 
 // RAMB18E1: 18K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -64,8 +106,8 @@ RAMB18E1 #(
    // Collision check: Values ("ALL", "WARNING_ONLY", "GENERATE_X_ONLY" or "NONE")
    .SIM_COLLISION_CHECK("ALL"),
    // DOA_REG, DOB_REG: Optional output register (0 or 1)
-   .DOA_REG(0),
-   .DOB_REG(0),
+   .DOA_REG(DOA_REG),
+   .DOB_REG(DOB_REG),
    // INITP_00 to INITP_07: Initial contents of parity memory array
    .INITP_00(256'h0000000000000000000000000000000000000000000000000000000000000000),
    .INITP_01(256'h0000000000000000000000000000000000000000000000000000000000000000),
@@ -148,10 +190,10 @@ RAMB18E1 #(
    // RAM Mode: "SDP" or "TDP"
    .RAM_MODE("TDP"),
    // READ_WIDTH_A/B, WRITE_WIDTH_A/B: Read/write width per port
-   .READ_WIDTH_A(0),                                                                 // 0-72
-   .READ_WIDTH_B(0),                                                                 // 0-18
-   .WRITE_WIDTH_A(0),                                                                // 0-18
-   .WRITE_WIDTH_B(0),                                                                // 0-72
+   .READ_WIDTH_A(READ_WIDTH_A),                                                                 // 0-72
+   .READ_WIDTH_B(READ_WIDTH_B),                                                                 // 0-18
+   .WRITE_WIDTH_A(WRITE_WIDTH_A),                                                               // 0-18
+   .WRITE_WIDTH_B(WRITE_WIDTH_B),                                                               // 0-72
    // RSTREG_PRIORITY_A, RSTREG_PRIORITY_B: Reset or enable priority ("RSTREG" or "REGCE")
    .RSTREG_PRIORITY_A("RSTREG"),
    .RSTREG_PRIORITY_B("RSTREG"),
@@ -161,45 +203,77 @@ RAMB18E1 #(
    // Simulation Device: Must be set to "7SERIES" for simulation behavior
    .SIM_DEVICE("7SERIES"),
    // WriteMode: Value on output upon a write ("WRITE_FIRST", "READ_FIRST", or "NO_CHANGE")
-   .WRITE_MODE_A("WRITE_FIRST"),
-   .WRITE_MODE_B("WRITE_FIRST")
+   .WRITE_MODE_A(WRITE_MODE_A),
+   .WRITE_MODE_B(WRITE_MODE_B)
 )
 RAMB18E1_inst (
    // Port A Data: 16-bit (each) output: Port A data
-   .DOADO(DOADO),                 // 16-bit output: A port data/LSB data
-   .DOPADOP(DOPADOP),             // 2-bit output: A port parity/LSB parity
+   .DOADO(DOADO_wire),            // 16-bit output: A port data/LSB data
+   .DOPADOP(DOPADOP_wire),        // 2-bit output: A port parity/LSB parity
    // Port B Data: 16-bit (each) output: Port B data
-   .DOBDO(DOBDO),                 // 16-bit output: B port data/MSB data
-   .DOPBDOP(DOPBDOP),             // 2-bit output: B port parity/MSB parity
+   .DOBDO(DOBDO_wire),            // 16-bit output: B port data/MSB data
+   .DOPBDOP(DOPBDOP_wire),        // 2-bit output: B port parity/MSB parity
    // Port A Address/Control Signals: 14-bit (each) input: Port A address and control signals (read port
    // when RAM_MODE="SDP")
-   .ADDRARDADDR(ADDRARDADDR),     // 14-bit input: A port address/Read address
-   .CLKARDCLK(CLKARDCLK),         // 1-bit input: A port clock/Read clock
-   .ENARDEN(ENARDEN),             // 1-bit input: A port enable/Read enable
-   .REGCEAREGCE(REGCEAREGCE),     // 1-bit input: A port register enable/Register enable
-   .RSTRAMARSTRAM(RSTRAMARSTRAM), // 1-bit input: A port set/reset
-   .RSTREGARSTREG(RSTREGARSTREG), // 1-bit input: A port register set/reset
-   .WEA(WEA),                     // 2-bit input: A port write enable
+   .ADDRARDADDR(ADDRARDADDR_wire),// 14-bit input: A port address/Read address
+   .CLKARDCLK(CLKA),              // 1-bit input: A port clock/Read clock
+   .ENARDEN(ENA),                 // 1-bit input: A port enable/Read enable
+   .REGCEAREGCE(REGCEA),          // 1-bit input: A port register enable/Register enable
+   .RSTRAMARSTRAM(RSTA),          // 1-bit input: A port set/reset
+   .RSTREGARSTREG(RSTA),          // 1-bit input: A port register set/reset
+   .WEA(WEA_wire),                // 2-bit input: A port write enable
    // Port A Data: 16-bit (each) input: Port A data
-   .DIADI(DIADI),                 // 16-bit input: A port data/LSB data
-   .DIPADIP(DIPADIP),             // 2-bit input: A port parity/LSB parity
+   .DIADI(DIADI_wire),            // 16-bit input: A port data/LSB data
+   .DIPADIP(DIPADIP_wire),        // 2-bit input: A port parity/LSB parity
    // Port B Address/Control Signals: 14-bit (each) input: Port B address and control signals (write port
    // when RAM_MODE="SDP")
-   .ADDRBWRADDR(ADDRBWRADDR),     // 14-bit input: B port address/Write address
-   .CLKBWRCLK(CLKBWRCLK),         // 1-bit input: B port clock/Write clock
-   .ENBWREN(ENBWREN),             // 1-bit input: B port enable/Write enable
+   .ADDRBWRADDR(ADDRBWRADDR_wire),// 14-bit input: B port address/Write address
+   .CLKBWRCLK(CLKB),              // 1-bit input: B port clock/Write clock
+   .ENBWREN(ENB),                 // 1-bit input: B port enable/Write enable
    .REGCEB(REGCEB),               // 1-bit input: B port register enable
-   .RSTRAMB(RSTRAMB),             // 1-bit input: B port set/reset
-   .RSTREGB(RSTREGB),             // 1-bit input: B port register set/reset
-   .WEBWE(WEBWE),                 // 4-bit input: B port write enable/Write enable
+   .RSTRAMB(RSTB),                // 1-bit input: B port set/reset
+   .RSTREGB(RSTB),                // 1-bit input: B port register set/reset
+   .WEBWE(WEBWE_wire),            // 4-bit input: B port write enable/Write enable
    // Port B Data: 16-bit (each) input: Port B data
-   .DIBDI(DIBDI),                 // 16-bit input: B port data/MSB data
-   .DIPBDIP(DIPBDIP)              // 2-bit input: B port parity/MSB parity
+   .DIBDI(DIBDI_wire),            // 16-bit input: B port data/MSB data
+   .DIPBDIP(DIPBDIP_wire)         // 2-bit input: B port parity/MSB parity
 );
 
 // End of RAMB18E1_inst instantiation
 
 end else begin
+
+// Internal signals for RAMB36E1
+logic [31:0] DOADO_wire;
+logic [31:0] DOBDO_wire;
+logic [3:0]  DOPADOP_wire;
+logic [3:0]  DOPBDOP_wire;
+logic [15:0] ADDRARDADDR_wire;
+logic [15:0] ADDRBWRADDR_wire;
+logic [31:0] DIADI_wire;
+logic [31:0] DIBDI_wire;
+logic [3:0]  DIPADIP_wire;
+logic [3:0]  DIPBDIP_wire;
+logic [3:0]  WEA_wire;
+logic [7:0]  WEBWE_wire;
+
+// Address mapping for 36Kb BRAM (16-bit address bus)
+assign ADDRARDADDR_wire = {{(16-ADDR_WIDTH_A){1'b0}}, ADDRA[ADDR_WIDTH_A-1:0]};
+assign ADDRBWRADDR_wire = {{(16-ADDR_WIDTH_B){1'b0}}, ADDRB[ADDR_WIDTH_B-1:0]};
+   
+// Data input mapping
+assign DIADI_wire = {{(32-WRITE_WIDTH_A){1'b0}}, DIA};
+assign DIBDI_wire = {{(32-WRITE_WIDTH_B){1'b0}}, DIB};
+assign DIPADIP_wire = 4'b0000;
+assign DIPBDIP_wire = 4'b0000;
+   
+// Data output mapping
+assign DOA = DOADO_wire[READ_WIDTH_A-1:0];
+assign DOB = DOBDO_wire[READ_WIDTH_B-1:0];
+   
+// Write enable mapping
+assign WEA_wire = {{(4-BRAM_WE_A){1'b0}}, WEA[BRAM_WE_A-1:0]};
+assign WEBWE_wire = {{(4-BRAM_WE_B){1'b0}}, WEB[BRAM_WE_B-1:0], 4'b0000};
 
 // RAMB36E1: 36K-bit Configurable Synchronous Block RAM
 //           7 Series
@@ -211,8 +285,8 @@ RAMB36E1 #(
    // Collision check: Values ("ALL", "WARNING_ONLY", "GENERATE_X_ONLY" or "NONE")
    .SIM_COLLISION_CHECK("ALL"),
    // DOA_REG, DOB_REG: Optional output register (0 or 1)
-   .DOA_REG(0),
-   .DOB_REG(0),
+   .DOA_REG(DOA_REG),
+   .DOB_REG(DOB_REG),
    .EN_ECC_READ("FALSE"),                                                            // Enable ECC decoder,
                                                                                      // FALSE, TRUE
    .EN_ECC_WRITE("FALSE"),                                                           // Enable ECC encoder,
@@ -374,10 +448,10 @@ RAMB36E1 #(
    .RAM_EXTENSION_A("NONE"),
    .RAM_EXTENSION_B("NONE"),
    // READ_WIDTH_A/B, WRITE_WIDTH_A/B: Read/write width per port
-   .READ_WIDTH_A(0),                                                                 // 0-72
-   .READ_WIDTH_B(0),                                                                 // 0-36
-   .WRITE_WIDTH_A(0),                                                                // 0-36
-   .WRITE_WIDTH_B(0),                                                                // 0-72
+   .READ_WIDTH_A(READ_WIDTH_A),                                                                 // 0-72
+   .READ_WIDTH_B(READ_WIDTH_B),                                                                 // 0-36
+   .WRITE_WIDTH_A(WRITE_WIDTH_A),                                                               // 0-36
+   .WRITE_WIDTH_B(WRITE_WIDTH_B),                                                               // 0-72
    // RSTREG_PRIORITY_A, RSTREG_PRIORITY_B: Reset or enable priority ("RSTREG" or "REGCE")
    .RSTREG_PRIORITY_A("RSTREG"),
    .RSTREG_PRIORITY_B("RSTREG"),
@@ -387,54 +461,54 @@ RAMB36E1 #(
    // Simulation Device: Must be set to "7SERIES" for simulation behavior
    .SIM_DEVICE("7SERIES"),
    // WriteMode: Value on output upon a write ("WRITE_FIRST", "READ_FIRST", or "NO_CHANGE")
-   .WRITE_MODE_A("WRITE_FIRST"),
-   .WRITE_MODE_B("WRITE_FIRST")
+   .WRITE_MODE_A(WRITE_MODE_A),
+   .WRITE_MODE_B(WRITE_MODE_B)
 )
 RAMB36E1_inst (
    // Cascade Signals: 1-bit (each) output: BRAM cascade ports (to create 64kx1)
-   .CASCADEOUTA(CASCADEOUTA),     // 1-bit output: A port cascade
-   .CASCADEOUTB(CASCADEOUTB),     // 1-bit output: B port cascade
+   .CASCADEOUTA(),                // 1-bit output: A port cascade
+   .CASCADEOUTB(),                // 1-bit output: B port cascade
    // ECC Signals: 1-bit (each) output: Error Correction Circuitry ports
-   .DBITERR(DBITERR),             // 1-bit output: Double bit error status
-   .ECCPARITY(ECCPARITY),         // 8-bit output: Generated error correction parity
-   .RDADDRECC(RDADDRECC),         // 9-bit output: ECC read address
-   .SBITERR(SBITERR),             // 1-bit output: Single bit error status
+   .DBITERR(),                    // 1-bit output: Double bit error status
+   .ECCPARITY(),                  // 8-bit output: Generated error correction parity
+   .RDADDRECC(),                  // 9-bit output: ECC read address
+   .SBITERR(),                    // 1-bit output: Single bit error status
    // Port A Data: 32-bit (each) output: Port A data
-   .DOADO(DOADO),                 // 32-bit output: A port data/LSB data
-   .DOPADOP(DOPADOP),             // 4-bit output: A port parity/LSB parity
+   .DOADO(DOADO_wire),            // 32-bit output: A port data/LSB data
+   .DOPADOP(DOPADOP_wire),        // 4-bit output: A port parity/LSB parity
    // Port B Data: 32-bit (each) output: Port B data
-   .DOBDO(DOBDO),                 // 32-bit output: B port data/MSB data
-   .DOPBDOP(DOPBDOP),             // 4-bit output: B port parity/MSB parity
+   .DOBDO(DOBDO_wire),            // 32-bit output: B port data/MSB data
+   .DOPBDOP(DOPBDOP_wire),        // 4-bit output: B port parity/MSB parity
    // Cascade Signals: 1-bit (each) input: BRAM cascade ports (to create 64kx1)
-   .CASCADEINA(CASCADEINA),       // 1-bit input: A port cascade
-   .CASCADEINB(CASCADEINB),       // 1-bit input: B port cascade
+   .CASCADEINA(0),                // 1-bit input: A port cascade
+   .CASCADEINB(0),                // 1-bit input: B port cascade
    // ECC Signals: 1-bit (each) input: Error Correction Circuitry ports
-   .INJECTDBITERR(INJECTDBITERR), // 1-bit input: Inject a double bit error
-   .INJECTSBITERR(INJECTSBITERR), // 1-bit input: Inject a single bit error
+   .INJECTDBITERR(0),             // 1-bit input: Inject a double bit error
+   .INJECTSBITERR(0),             // 1-bit input: Inject a single bit error
    // Port A Address/Control Signals: 16-bit (each) input: Port A address and control signals (read port
    // when RAM_MODE="SDP")
-   .ADDRARDADDR(ADDRARDADDR),     // 16-bit input: A port address/Read address
-   .CLKARDCLK(CLKARDCLK),         // 1-bit input: A port clock/Read clock
-   .ENARDEN(ENARDEN),             // 1-bit input: A port enable/Read enable
-   .REGCEAREGCE(REGCEAREGCE),     // 1-bit input: A port register enable/Register enable
-   .RSTRAMARSTRAM(RSTRAMARSTRAM), // 1-bit input: A port set/reset
-   .RSTREGARSTREG(RSTREGARSTREG), // 1-bit input: A port register set/reset
-   .WEA(WEA),                     // 4-bit input: A port write enable
+   .ADDRARDADDR(ADDRARDADDR_wire),// 16-bit input: A port address/Read address
+   .CLKARDCLK(CLKA),              // 1-bit input: A port clock/Read clock
+   .ENARDEN(ENA),                 // 1-bit input: A port enable/Read enable
+   .REGCEAREGCE(REGCEA),          // 1-bit input: A port register enable/Register enable
+   .RSTRAMARSTRAM(RSTA),          // 1-bit input: A port set/reset
+   .RSTREGARSTREG(RSTA),          // 1-bit input: A port register set/reset
+   .WEA(WEA_wire),                // 4-bit input: A port write enable
    // Port A Data: 32-bit (each) input: Port A data
-   .DIADI(DIADI),                 // 32-bit input: A port data/LSB data
-   .DIPADIP(DIPADIP),             // 4-bit input: A port parity/LSB parity
+   .DIADI(DIADI_wire),            // 32-bit input: A port data/LSB data
+   .DIPADIP(DIPADIP_wire),        // 4-bit input: A port parity/LSB parity
    // Port B Address/Control Signals: 16-bit (each) input: Port B address and control signals (write port
    // when RAM_MODE="SDP")
-   .ADDRBWRADDR(ADDRBWRADDR),     // 16-bit input: B port address/Write address
-   .CLKBWRCLK(CLKBWRCLK),         // 1-bit input: B port clock/Write clock
-   .ENBWREN(ENBWREN),             // 1-bit input: B port enable/Write enable
+   .ADDRBWRADDR(ADDRBWRADDR_wire),// 16-bit input: B port address/Write address
+   .CLKBWRCLK(CLKB),              // 1-bit input: B port clock/Write clock
+   .ENBWREN(ENB),                 // 1-bit input: B port enable/Write enable
    .REGCEB(REGCEB),               // 1-bit input: B port register enable
-   .RSTRAMB(RSTRAMB),             // 1-bit input: B port set/reset
-   .RSTREGB(RSTREGB),             // 1-bit input: B port register set/reset
-   .WEBWE(WEBWE),                 // 8-bit input: B port write enable/Write enable
+   .RSTRAMB(RSTB),                // 1-bit input: B port set/reset
+   .RSTREGB(RSTB),                // 1-bit input: B port register set/reset
+   .WEBWE(WEBWE_wire),            // 8-bit input: B port write enable/Write enable
    // Port B Data: 32-bit (each) input: Port B data
-   .DIBDI(DIBDI),                 // 32-bit input: B port data/MSB data
-   .DIPBDIP(DIPBDIP)              // 4-bit input: B port parity/MSB parity
+   .DIBDI(DIBDI_wire),            // 32-bit input: B port data/MSB data
+   .DIPBDIP(DIPBDIP_wire)         // 4-bit input: B port parity/MSB parity
 );
 
 // End of RAMB36E1_inst instantiation
