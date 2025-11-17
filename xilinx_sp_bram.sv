@@ -27,6 +27,7 @@ import xilinx_primitive_pkg::*;
    parameter INIT               = 36'h000000000, // Initial values on output port
    parameter INIT_FILE          = "NONE",
    parameter WRITE_WIDTH        = 1, // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+   parameter WE_WIDTH           = ((WRITE_WIDTH+7)/8),
    parameter READ_WIDTH         = 1,  // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
    parameter SRVAL              = 36'h000000000, // Set/Reset value for port output
    parameter WRITE_MODE         = "WRITE_FIRST" // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
@@ -38,7 +39,7 @@ import xilinx_primitive_pkg::*;
    input  logic                     EN,       // 1-bit input RAM enable
    input  logic                     REGCE,    // 1-bit input output register enable
    input  logic                     RST,      // 1-bit input reset
-   input  logic [7:0]               WE        // Input write enable, width defined by write port depth
+   input  logic [WE_WIDTH-1:0]      WE        // Input write enable, width defined by write port depth
 );
 
 localparam MAX_WIDTH = (WRITE_WIDTH > READ_WIDTH) ? WRITE_WIDTH : READ_WIDTH;
@@ -49,13 +50,18 @@ localparam BRAM_NUMBER_RD = ((READ_WIDTH + BANK_WIDTH - 1) / BANK_WIDTH);
 localparam BRAM_NUMBER_WR = ((WRITE_WIDTH + BANK_WIDTH - 1) / BANK_WIDTH);
 localparam BRAM_NUMBER = (BRAM_NUMBER_RD > BRAM_NUMBER_WR) ? BRAM_NUMBER_RD : BRAM_NUMBER_WR;
 
-logic [READ_WIDTH-1:0]    DO_bank;       // Output data, width defined by READ_WIDTH parameter
-logic [WRITE_WIDTH-1:0]   DI_bank;       // Input data port, width defined by WRITE_WIDTH parameter
-logic [7:0]               WE_bank;       // Input write enable, width defined by write port depth
+// Calculate actual per-bank widths
+localparam BANK_RD_W = ((READ_WIDTH + BRAM_NUMBER - 1) / BRAM_NUMBER);
+localparam BANK_WR_W = ((WRITE_WIDTH + BRAM_NUMBER - 1) / BRAM_NUMBER);
+localparam BANK_WE_W = ((BANK_WR_W+7)/8);
+
+logic [BRAM_NUMBER * BANK_RD_W-1:0] DO_bank;         // Output read data port, width defined by READ_WIDTH parameter
+logic [BRAM_NUMBER * BANK_WR_W-1:0] DI_bank;         // Input write data port, width defined by WRITE_WIDTH parameter
+logic [BRAM_NUMBER * BANK_WE_W-1:0] WE_bank;         // Input write enable, width defined by write port depth
 
 // Pad write data with zeros if needed
-assign DI_bank = ()'(DI[WRITE_WIDTH-1:0]);
-assign WE_bank = ()'(WE);
+assign DI_bank = (BRAM_NUMBER * BANK_WR_W)'(DI[WRITE_WIDTH-1:0]);
+assign WE_bank = (BRAM_NUMBER * BANK_WE_W)'(WE);
 
 // Extract read data (trim padding)
 assign DO = DO_bank[READ_WIDTH-1:0];
@@ -68,19 +74,19 @@ generate;
             .DO_REG       (DO_REG     ), // Optional output register (0 or 1)
             .INIT         (INIT       ), // Initial values on output port
             .INIT_FILE    (INIT_FILE  ),
-            .WRITE_WIDTH  (WRITE_WIDTH), // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
-            .READ_WIDTH   (READ_WIDTH ), // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+            .WRITE_WIDTH  (BANK_WR_W  ), // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
+            .READ_WIDTH   (BANK_RD_W  ), // Valid values are 1-72 (37-72 only valid when BRAM_SIZE="36Kb")
             .SRVAL        (SRVAL      ), // Set/Reset value for port output
             .WRITE_MODE   (WRITE_MODE )  // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
         ) u_macro (
-            .DO     (DO_bank[i*BANK_WIDTH +: BANK_WIDTH]), // Output data, width defined by READ_WIDTH parameter
+            .DO     (DO_bank[i*BANK_RD_W +: BANK_RD_W]  ), // Output data, width defined by READ_WIDTH parameter
             .ADDR   (ADDR                               ), // Input address, width defined by read/write port depth
             .CLK    (CLK                                ), // 1-bit input clock
-            .DI     (DI_bank[i*BANK_WIDTH +: BANK_WIDTH]), // Input data port, width defined by WRITE_WIDTH parameter
+            .DI     (DI_bank[i*BANK_WR_W +: BANK_WR_W]  ), // Input data port, width defined by WRITE_WIDTH parameter
             .EN     (EN                                 ), // 1-bit input RAM enable
             .REGCE  (REGCE                              ), // 1-bit input output register enable
             .RST    (RST                                ), // 1-bit input reset
-            .WE     (WE_bank[i*BANK_WIDTH +: BANK_WIDTH])  // Input write enable, width defined by write port depth
+            .WE     (WE_bank[i*BANK_WE_W +: BANK_WE_W]  )  // Input write enable, width defined by write port depth
         );
     end
 endgenerate

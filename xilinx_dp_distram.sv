@@ -18,7 +18,7 @@ localparam RAM_DEPTH = (2**ADDR_WIDTH);
 //            7 Series
 // Xilinx HDL Language Template, version 2025.1
 
-generate if (RAM_DEPTH==128) begin
+generate if (RAM_DEPTH>64) begin
     for (genvar i=0; i<DATA_WIDTH; i++) begin
         RAM128X1D #(
             .INIT(128'h00000000000000000000000000000000)
@@ -32,7 +32,7 @@ generate if (RAM_DEPTH==128) begin
             .WE(WE)         // Write enable input
         );
     end
-end else if (RAM_DEPTH==64) begin
+end else if (RAM_DEPTH>32 && RAM_DEPTH<=64) begin
     for (genvar i=0; i<DATA_WIDTH; i++) begin
         RAM64X1D #(
             .INIT(64'h0000000000000000) // Initial contents of RAM
