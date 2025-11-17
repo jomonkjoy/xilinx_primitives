@@ -54,8 +54,36 @@ import xilinx_primitive_pkg::*;
    input  logic [3:0]               WEB        // Input port-B write enable, width defined by Port B depth
 );
 
+localparam MAX_WIDTH = (WRITE_WIDTH_A > READ_WIDTH_A) ? WRITE_WIDTH_A : 
+                       (READ_WIDTH_A > WRITE_WIDTH_B) ? READ_WIDTH_A :
+                       (WRITE_WIDTH_B > READ_WIDTH_B) ? WRITE_WIDTH_B : READ_WIDTH_B;
+
+localparam BANK_WIDTH = (BRAM_SIZE == "36Kb" && MAX_WIDTH > 18) ? 32 : 18;
+
+// Calculate number of banks needed for each port
+localparam BRAM_NUMBER_A = ((WRITE_WIDTH_A > READ_WIDTH_A ? WRITE_WIDTH_A : READ_WIDTH_A) + BANK_WIDTH - 1) / BANK_WIDTH;
+localparam BRAM_NUMBER_B = ((WRITE_WIDTH_B > READ_WIDTH_B ? WRITE_WIDTH_B : READ_WIDTH_B) + BANK_WIDTH - 1) / BANK_WIDTH;
+localparam BRAM_NUMBER = (BRAM_NUMBER_A > BRAM_NUMBER_B) ? BRAM_NUMBER_A : BRAM_NUMBER_B;
+
+logic [READ_WIDTH_A-1:0]  DOA_bank;       // Output port-A data, width defined by READ_WIDTH_A parameter
+logic [READ_WIDTH_B-1:0]  DOB_bank;       // Output port-B data, width defined by READ_WIDTH_B parameter
+logic [WRITE_WIDTH_A-1:0] DIA_bank;       // Input port-A data, width defined by WRITE_WIDTH_A parameter
+logic [WRITE_WIDTH_B-1:0] DIB_bank;       // Input port-B data, width defined by WRITE_WIDTH_B parameter
+logic [3:0]               WEA_bank;       // Input port-A write enable, width defined by Port A depth
+logic [3:0]               WEB_bank;       // Input port-B write enable, width defined by Port B depth
+
+// Pad write data with zeros if needed
+assign DIA_bank = ()'(DIA[WRITE_WIDTH_A-1:0]);
+assign WEA_bank = ()'(WEA);
+assign DIB_bank = ()'(DIB[WRITE_WIDTH_B-1:0]);
+assign WEB_bank = ()'(WEB);
+
+// Extract read data (trim padding)
+assign DOA = DOA_bank[READ_WIDTH_A-1:0];
+assign DOB = DOB_bank[READ_WIDTH_B-1:0];
+
 generate;
-    for (genvar i=0; i<N; ++i) begin
+    for (genvar i=0; i<BRAM_NUMBER; ++i) begin : gen_bank
         xilinx_tdp_bram_macro #(
             .BRAM_SIZE              (BRAM_SIZE          ), // Target BRAM: "18Kb" or "36Kb"
             .DEVICE                 (DEVICE             ), // Target device: "7SERIES"
@@ -74,22 +102,22 @@ generate;
             .WRITE_WIDTH_A          (WRITE_WIDTH_A      ), // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
             .WRITE_WIDTH_B          (WRITE_WIDTH_B      )  // Valid values are 1-36 (19-36 only valid when BRAM_SIZE="36Kb")
         ) u_macro (
-            .DOA    (DOA   ), // Output port-A data, width defined by READ_WIDTH_A parameter
-            .DOB    (DOB   ), // Output port-B data, width defined by READ_WIDTH_B parameter
-            .ADDRA  (ADDRA ), // Input port-A address, width defined by Port A depth
-            .ADDRB  (ADDRB ), // Input port-B address, width defined by Port B depth
-            .CLKA   (CLKA  ), // 1-bit input port-A clock
-            .CLKB   (CLKB  ), // 1-bit input port-B clock
-            .DIA    (DIA   ), // Input port-A data, width defined by WRITE_WIDTH_A parameter
-            .DIB    (DIB   ), // Input port-B data, width defined by WRITE_WIDTH_B parameter
-            .ENA    (ENA   ), // 1-bit input port-A enable
-            .ENB    (ENB   ), // 1-bit input port-B enable
-            .REGCEA (REGCEA), // 1-bit input port-A output register enable
-            .REGCEB (REGCEB), // 1-bit input port-B output register enable
-            .RSTA   (RSTA  ), // 1-bit input port-A reset
-            .RSTB   (RSTB  ), // 1-bit input port-B reset
-            .WEA    (WEA   ), // Input port-A write enable, width defined by Port A depth
-            .WEB    (WEB   )  // Input port-B write enable, width defined by Port B depth
+            .DOA    (DOA_bank[i*BANK_WIDTH +: BANK_WIDTH]   ), // Output port-A data, width defined by READ_WIDTH_A parameter
+            .DOB    (DOB_bank[i*BANK_WIDTH +: BANK_WIDTH]   ), // Output port-B data, width defined by READ_WIDTH_B parameter
+            .ADDRA  (ADDRA                                  ), // Input port-A address, width defined by Port A depth
+            .ADDRB  (ADDRB                                  ), // Input port-B address, width defined by Port B depth
+            .CLKA   (CLKA                                   ), // 1-bit input port-A clock
+            .CLKB   (CLKB                                   ), // 1-bit input port-B clock
+            .DIA    (DIA_bank[i*BANK_WIDTH +: BANK_WIDTH]   ), // Input port-A data, width defined by WRITE_WIDTH_A parameter
+            .DIB    (DIB_bank[i*BANK_WIDTH +: BANK_WIDTH]   ), // Input port-B data, width defined by WRITE_WIDTH_B parameter
+            .ENA    (ENA                                    ), // 1-bit input port-A enable
+            .ENB    (ENB                                    ), // 1-bit input port-B enable
+            .REGCEA (REGCEA                                 ), // 1-bit input port-A output register enable
+            .REGCEB (REGCEB                                 ), // 1-bit input port-B output register enable
+            .RSTA   (RSTA                                   ), // 1-bit input port-A reset
+            .RSTB   (RSTB                                   ), // 1-bit input port-B reset
+            .WEA    (WEA_bank[i*BANK_WIDTH +: BANK_WIDTH]   ), // Input port-A write enable, width defined by Port A depth
+            .WEB    (WEB_bank[i*BANK_WIDTH +: BANK_WIDTH]   )  // Input port-B write enable, width defined by Port B depth
         );
     end
 endgenerate

@@ -41,8 +41,27 @@ import xilinx_primitive_pkg::*;
    input  logic [7:0]               WE        // Input write enable, width defined by write port depth
 );
 
+localparam MAX_WIDTH = (WRITE_WIDTH > READ_WIDTH) ? WRITE_WIDTH : READ_WIDTH;
+localparam BANK_WIDTH = (BRAM_SIZE == "36Kb" && MAX_WIDTH > 36) ? 64 : 32;
+
+// Calculate number of banks needed
+localparam BRAM_NUMBER_RD = ((READ_WIDTH + BANK_WIDTH - 1) / BANK_WIDTH);
+localparam BRAM_NUMBER_WR = ((WRITE_WIDTH + BANK_WIDTH - 1) / BANK_WIDTH);
+localparam BRAM_NUMBER = (BRAM_NUMBER_RD > BRAM_NUMBER_WR) ? BRAM_NUMBER_RD : BRAM_NUMBER_WR;
+
+logic [READ_WIDTH-1:0]    DO_bank;       // Output data, width defined by READ_WIDTH parameter
+logic [WRITE_WIDTH-1:0]   DI_bank;       // Input data port, width defined by WRITE_WIDTH parameter
+logic [7:0]               WE_bank;       // Input write enable, width defined by write port depth
+
+// Pad write data with zeros if needed
+assign DI_bank = ()'(DI[WRITE_WIDTH-1:0]);
+assign WE_bank = ()'(WE);
+
+// Extract read data (trim padding)
+assign DO = DO_bank[READ_WIDTH-1:0];
+
 generate;
-    for (genvar i=0; i<N; ++i) begin
+    for (genvar i=0; i<BRAM_NUMBER; ++i) begin : gen_bank
         xilinx_sp_bram_macro #(
             .BRAM_SIZE    (BRAM_SIZE  ), // Target BRAM, "18Kb" or "36Kb"
             .DEVICE       (DEVICE     ), // Target Device: "7SERIES"
@@ -54,14 +73,14 @@ generate;
             .SRVAL        (SRVAL      ), // Set/Reset value for port output
             .WRITE_MODE   (WRITE_MODE )  // "WRITE_FIRST", "READ_FIRST", or "NO_CHANGE"
         ) u_macro (
-            .DO     (DO   ), // Output data, width defined by READ_WIDTH parameter
-            .ADDR   (ADDR ), // Input address, width defined by read/write port depth
-            .CLK    (CLK  ), // 1-bit input clock
-            .DI     (DI   ), // Input data port, width defined by WRITE_WIDTH parameter
-            .EN     (EN   ), // 1-bit input RAM enable
-            .REGCE  (REGCE), // 1-bit input output register enable
-            .RST    (RST  ), // 1-bit input reset
-            .WE     (WE   )  // Input write enable, width defined by write port depth
+            .DO     (DO_bank[i*BANK_WIDTH +: BANK_WIDTH]), // Output data, width defined by READ_WIDTH parameter
+            .ADDR   (ADDR                               ), // Input address, width defined by read/write port depth
+            .CLK    (CLK                                ), // 1-bit input clock
+            .DI     (DI_bank[i*BANK_WIDTH +: BANK_WIDTH]), // Input data port, width defined by WRITE_WIDTH parameter
+            .EN     (EN                                 ), // 1-bit input RAM enable
+            .REGCE  (REGCE                              ), // 1-bit input output register enable
+            .RST    (RST                                ), // 1-bit input reset
+            .WE     (WE_bank[i*BANK_WIDTH +: BANK_WIDTH])  // Input write enable, width defined by write port depth
         );
     end
 endgenerate
