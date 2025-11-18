@@ -74,18 +74,18 @@ module shallow_fifo_sync #(
             fifo_count <= '0;
         else begin
             case ({wren_internal, rden_internal})
-                2'b10: fifo_count <= fifo_count + 1'b1;  // Write only
-                2'b01: fifo_count <= fifo_count - 1'b1;  // Read only
-                default: fifo_count <= fifo_count;        // Both or neither
+                2'b10   : fifo_count <= fifo_count + 1'b1;  // Write only
+                2'b01   : fifo_count <= fifo_count - 1'b1;  // Read only
+                default : fifo_count <= fifo_count;        // Both or neither
             endcase
         end
     end
     
     // Status signals
-    assign empty = (fifo_count == 0);
-    assign full  = (fifo_count == FIFO_DEPTH);
-    assign prog_empty = (fifo_count <= PROG_EMPTY_THRESH);
-    assign prog_full  = (fifo_count >= (FIFO_DEPTH-PROG_FULL_THRESH));
-    assign count = fifo_count;
+    assign empty        = (fifo_count == 0);
+    assign full         = (fifo_count == FIFO_DEPTH);
+    assign prog_empty   = (fifo_count <= PROG_EMPTY_THRESH);
+    assign prog_full    = (fifo_count >= PROG_FULL_THRESH);
+    assign count        = fifo_count;
 
 endmodule
