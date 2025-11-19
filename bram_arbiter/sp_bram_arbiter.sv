@@ -58,7 +58,7 @@ module sp_bram_arbiter #(
 
     assign arb_req[N-1:0] = client_en[N-1:0];
     assign client_busy[N-1:0] = ~arb_grant_oh[N-1:0];
-    assign fifo_wr_en = (arb_grant_vld & ~(|client_we));
+    assign fifo_wr_en = (arb_grant_vld & ~(|client_we[arb_grant_idx]));
     assign fifo_wr_data = arb_grant_idx;
     assign fifo_rd_en = dvld_shift_reg[READ_LATENCY-1];
 
@@ -67,7 +67,7 @@ module sp_bram_arbiter #(
             if (~rst_n) begin
                 dvld_shift_reg <= '0;
             end else begin
-                dvld_shift_reg[0] <= (arb_grant_vld & ~(|client_we));
+                dvld_shift_reg[0] <= (arb_grant_vld & ~(|client_we[arb_grant_idx]));
                 dvld_shift_reg[READ_LATENCY-1:1] <= dvld_shift_reg[READ_LATENCY-2:0];
             end
         end
@@ -76,7 +76,7 @@ module sp_bram_arbiter #(
             if (~rst_n) begin
                 dvld_shift_reg <= '0;
             end else begin
-                dvld_shift_reg <= (arb_grant_vld & ~(|client_we));
+                dvld_shift_reg <= (arb_grant_vld & ~(|client_we[arb_grant_idx]));
             end
         end
     end endgenerate
