@@ -34,14 +34,16 @@ module sp_bram_arbiter #(
     logic                   arb_grant_vld;
 
     logic                   fifo_wr_en;
-    logic [$clog2(N):0]     fifo_wr_data;
+    logic [$clog2(N)-1:0]   fifo_wr_data;
     logic                   fifo_rd_en;
-    logic [$clog2(N):0]     fifo_rd_data;
+    logic [$clog2(N)-1:0]   fifo_rd_data;
     logic                   fifo_full;
     logic                   fifo_empty;
     logic                   fifo_prog_full;
     logic                   fifo_prog_empty;
     logic [3:0]             fifo_count;
+
+    logic [READ_LATENCY-1:0] dvld_shift_reg;
 
     scheduler_rr_arbiter #(
         .N  (N)
@@ -56,14 +58,33 @@ module sp_bram_arbiter #(
 
     assign arb_req[N-1:0] = client_en[N-1:0];
     assign client_busy[N-1:0] = ~arb_grant_oh[N-1:0];
-    assign fifo_wr_en = arb_grant_vld;
-    assign fifo_wr_data = {(|client_we),arb_grant_idx};
-    assign fifo_rd_en = fifo_prog_full;
+    assign fifo_wr_en = (arb_grant_vld & ~(|client_we));
+    assign fifo_wr_data = arb_grant_idx;
+    assign fifo_rd_en = dvld_shift_reg[READ_LATENCY-1];
+
+    generate if (READ_LATENCY>1) begin : rd_latency_gt1
+        always_ff @(posedge clk or negedge rst_n) begin
+            if (~rst_n) begin
+                dvld_shift_reg <= '0;
+            end else begin
+                dvld_shift_reg[0] <= (arb_grant_vld & ~(|client_we));
+                dvld_shift_reg[READ_LATENCY-1:1] <= dvld_shift_reg[READ_LATENCY-2:0];
+            end
+        end
+    end else begin : rd_latency_eq1
+        always_ff @(posedge clk or negedge rst_n) begin
+            if (~rst_n) begin
+                dvld_shift_reg <= '0;
+            end else begin
+                dvld_shift_reg <= (arb_grant_vld & ~(|client_we));
+            end
+        end
+    end endgenerate
     
     shallow_fifo_sync #(
-        .DATA_WIDTH            ($clog2(N)+1),
+        .DATA_WIDTH            ($clog2(N)),
         .FIFO_DEPTH            (8),
-        .PROG_FULL_THRESH      (READ_LATENCY),
+        .PROG_FULL_THRESH      (4),
         .PROG_EMPTY_THRESH     (1),
         .COUNT_WIDTH           (4)
     ) u_shallow_fifo_sync (
@@ -95,7 +116,7 @@ module sp_bram_arbiter #(
         for (int i=0; i<N; i++) begin
             if (fifo_rd_en & fifo_rd_data[$clog2(N)-1:0] == i[$clog2(N)-1:0]) begin
                 client_do[i] = sram_do;
-                client_dvld[i] = ~fifo_rd_data[$clog2(N)]; // Qualifier is WE
+                client_dvld[i] = 1'b1; // Read enable qualified the operation
             end
         end
     end
