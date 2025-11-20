@@ -33,7 +33,8 @@ module shallow_fifo_sync #(
     logic                   rden_internal;
     
     // Write enable generation (write only if not full and wr_en is asserted)
-    assign wren_internal = wr_en & ~full;
+    assign wren_internal = wr_en & ~(full & ~rden_internal);
+    // If FIFO is full but a read is happening, there will be space next cycle → allow write.
     
     // Read enable generation (read only if not empty and rd_en is asserted)
     assign rden_internal = rd_en & ~empty;
